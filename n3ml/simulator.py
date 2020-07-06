@@ -1,9 +1,13 @@
+from n3ml.network import build_network
+
 class Simulator:
     def __init__(self, network, dt):
         self.network = network
         self.dt = dt
 
-        cg = build_network(network)
+        self.cg = build_network(network)
+
+        print(self.cg.tensors)
 
         pass
 

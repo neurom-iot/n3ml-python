@@ -16,6 +16,8 @@ def build_connection(instance, cg):
     size_inp = inp.shape[0]
     size_out = out.shape[0]
 
+    cg.tensors[instance] = {}
+
     cg.tensors[instance]['weights'] = np.zeros((size_out, size_inp), dtype=np.float)
     w = cg.tensors[instance]['weights']
     w = instance.initializer((size_out, size_inp))

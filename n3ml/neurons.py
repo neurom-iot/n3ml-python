@@ -22,13 +22,17 @@ class IF(Neuron):
         v = v - spikes
 
 def build_IF(instance, cg):
-    cg.tensors[instance]['in'] = np.asarray(0, dtype=np.float)
-    cg.tensors[instance]['out'] = np.asarray(0, dtype=np.float)
-    cg.tensors[instance]['v'] = np.asarray(instance.v0, dtype=np.float)
+    cg.tensors[instance] = {}
+
+    cg.tensors[instance]['in'] = np.asarray([0], dtype=np.float)
+    cg.tensors[instance]['out'] = np.asarray([0], dtype=np.float)
+    cg.tensors[instance]['v'] = np.asarray([instance.v0], dtype=np.float)
 
     inp = cg.tensors[instance]['in']
     out = cg.tensors[instance]['out']
     v = cg.tensors[instance]['v']
+
+    print(inp.shape)
 
     def simulate_neuron():
         instance(inp, out, v=v, vth=instance.vth, dt=instance.dt)
