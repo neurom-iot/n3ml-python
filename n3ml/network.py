@@ -1,6 +1,8 @@
 from n3ml.neurons import Neuron, build_IF
 from n3ml.connection import Connection, build_connection
 from n3ml.population import Population, build_population
+from n3ml.operators import Operator
+
 
 class Network:
     def __init__(self):
@@ -17,12 +19,26 @@ class Network:
 
         pass
 
+
 class ComputationalGraph:
     def __init__(self):
         self.tensors = {}
         self.operators = []
 
         pass
+
+    def add_op(self, op):
+        if isinstance(op, Operator):
+            self.operators.append(op)
+
+        pass
+
+    def run_step(self):
+        for op in self.operators:
+            op.run_step()
+
+        pass
+
 
 def build_network(network):
     cg = ComputationalGraph()
