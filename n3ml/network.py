@@ -3,6 +3,8 @@ from n3ml.connection import Connection, build_connection
 from n3ml.population import Population, build_population
 from n3ml.operators import Operator
 
+__all__ = ['Network']
+
 
 class Network:
     def __init__(self):

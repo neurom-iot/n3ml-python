@@ -26,3 +26,33 @@ class Matmul(Operator):
 
     def run_step(self):
         self.y = np.matmul(self.x, self.W.transpose())
+
+
+class Add(Operator):
+    def __init__(self, z, x, y):
+        self.z = z
+        self.x = x
+        self.y = y
+
+    def make_step(self):
+        self.z = self.x + self.y
+
+
+class Mul(Operator):
+    def __init__(self, z, x, y):
+        self.z = z
+        self.x = x
+        self.y = y
+
+    def make_step(self):
+        self.z = self.x * self.y
+
+
+class Div(Operator):
+    def __init__(self, z, x, y):
+        self.z = z
+        self.x = x
+        self.y = y
+
+    def make_step(self):
+        self.z = self.x / self.y

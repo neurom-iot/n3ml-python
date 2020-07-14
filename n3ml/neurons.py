@@ -1,9 +1,15 @@
 import math
 import numpy as np
+from n3ml.network import Network
+
 
 class Neuron(object):
     def __init__(self):
         pass
+
+    def build(self):
+        NotImplementedError
+
 
 class IF(Neuron):
     def __init__(self, v0=0, vth=1, dt=0.001):
@@ -20,6 +26,15 @@ class IF(Neuron):
         spikes = math.floor(v / vth)
         out = spikes / dt
         v = v - spikes
+
+
+class LIF(Neuron):
+    def __init__(self):
+        pass
+
+    def build(self, model: Network) -> None:
+        pass
+
 
 def build_IF(instance, cg):
     cg.tensors[instance] = {}
