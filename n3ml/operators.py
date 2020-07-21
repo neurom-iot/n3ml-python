@@ -1,7 +1,5 @@
 import numpy as np
 
-import n3ml.signal
-import n3ml.source
 
 class Operator(object):
     def __init__(self):
@@ -77,12 +75,13 @@ class SimNeurons(Operator):
 
 
 class Sample(Operator):
+    import n3ml.signal
+
     def __init__(self,
-                 source: n3ml.source.Source,
+                 source,
                  output: n3ml.signal.Signal):
         self.source = source
         self.output = output
-        raise NotImplementedError
 
     def make_step(self):
         self.source.distribution(0, 1, self.output)
