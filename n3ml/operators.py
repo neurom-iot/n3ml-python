@@ -1,5 +1,7 @@
 import numpy as np
 
+import n3ml.signal
+import n3ml.source
 
 class Operator(object):
     def __init__(self):
@@ -56,3 +58,31 @@ class Div(Operator):
 
     def make_step(self):
         self.z = self.x / self.y
+
+
+class SimNeurons(Operator):
+    def __init__(self, instance, x, y, v):
+        self.instance = instance
+        self.x = x
+        self.y = y
+        self.v = v
+
+    def make_step(self):
+        self.v += self.v
+        self.v -= self.instance.time_step / self.instance.time_constant * (self.v - self.x)
+
+        self.y = (self.v > self.instance.threshold).astype(np.float)
+
+        self.v[self.v > self.instance.threshold] = self.instance.rest_potentials
+
+
+class Sample(Operator):
+    def __init__(self,
+                 source: n3ml.source.Source,
+                 output: n3ml.signal.Signal):
+        self.source = source
+        self.output = output
+        raise NotImplementedError
+
+    def make_step(self):
+        self.source.distribution(0, 1, self.output)

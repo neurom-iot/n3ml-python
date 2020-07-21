@@ -1,40 +1,29 @@
 import numpy as np
 
 from n3ml.neurons import IF, LIF, build_IF
-from n3ml.operators import Init, Add, Div, Mul
+from n3ml.operators import Init, Add, Div, Mul, SimNeurons
 
 
 class Population:
-    def __init__(self, num_neurons=1, neuron_type=LIF, resting=0, tc=0):
+    def __init__(self, num_neurons=1, neuron_type=LIF, rest_potentials=0,
+                 threshold=1, time_constant=1, time_step=0.001):
         self.num_neurons = num_neurons
         self.neuron_type = neuron_type
-        self.resting = resting
-        self.tc = tc
-
-        pass
+        self.rest_potentials = rest_potentials
+        self.time_constant = time_constant
+        self.time_step = time_step
+        self.threshold = threshold
 
     def build(self, model) -> None:
-        model.set_var(self, 'input', np.zeros(self.num_neurons, dtype=np.float))
-        model.set_var(self, 'output', np.zeros(self.num_neurons, dtype=np.float))
-        model.set_var(self, 'voltage', np.zeros(self.num_neurons, dtype=np.float))
+        # Define the signals of a population
+        model.signal[self] = dict()
+        model.signal[self]['input'] = np.zeros(self.num_neurons, dtype=np.float)
+        model.signal[self]['output'] = np.zeros(self.num_neurons, dtype=np.float)
+        model.signal[self]['voltage'] = np.zeros(self.num_neurons, dtype=np.float)
 
-        model.add_op(Init(model.get_var(self, 'voltage'), self.resting))
+        # Initialize the signal of the voltage
+        model.add_op(Init(model[self]['voltage']))
 
-        model.set_var(self, 'intermediary', np.zeros(self.num_neurons, dtype=np.float))
-        model.add_op(Add(model.get_var(self, 'intermediary'),
-                         model.get_var(self, 'voltage'), model.get_var(self, 'input')))
-
-        model.set_var(self, 'tc', np.array([self.tc], dtype=np.float))
-        model.set_var(self, 'constant', np.zeros(1, dtype=np.float))
-        model.add_op(Div(model.get_var(self, 'constant'),
-                         model.get_var('dt'), model.get_var(self, 'tc')))
-
-        model.set_var(self, 'intermediary2', np.zeros(self.num_neurons, dtype=np.float))
-        model.add_op(Mul(model.get_var(self, 'intermediary2'),
-                         model.get_var(self, 'intermediary'), model.get_var(self, 'constant')))
-
-        model.set_var(self, 'intermediary3', np.zeros(self.num_neurons, dtype=np.float))
-        model.add_op(Add(model.get_var(self, 'voltage'),
-                         model.get_var(self, 'voltage'), model.get_var(self, 'intermediary3')))
-
-        pass
+        # Simulate the spiking neurons of the population
+        model.add_op(SimNeurons(self, model.signal[self]['input'],
+                                model.signal[self]['output'], model.signal[self]['voltage']))
