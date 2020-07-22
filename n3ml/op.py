@@ -1,4 +1,6 @@
-import numpy as np
+import numpy
+
+import n3ml.core
 
 
 class Operator(object):
@@ -7,7 +9,9 @@ class Operator(object):
 
 
 class Init(Operator):
-    def __init__(self, tensor, initializer=None):
+    def __init__(self,
+                 signal: n3ml.core.Signal,
+                 initializer=None):
         # TODO: 오버로딩으로 구현
         self.tensor = tensor
         self.initializer = initializer
@@ -75,11 +79,11 @@ class SimNeurons(Operator):
 
 
 class Sample(Operator):
-    import n3ml.signal
+    import n3ml.core
 
     def __init__(self,
-                 source,
-                 output: n3ml.signal.Signal):
+                 source: n3ml.core.Model,
+                 output: n3ml.core.Signal) -> None:
         self.source = source
         self.output = output
 

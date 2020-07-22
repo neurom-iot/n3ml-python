@@ -1,4 +1,10 @@
-import n3ml.operators
+import numpy
+
+import n3ml.op
+
+
+class Signal(numpy.ndarray):
+    pass
 
 
 class Model:
@@ -7,10 +13,10 @@ class Model:
         self.operator = list()
 
     def add_op(self,
-               op: n3ml.operators.Operator) -> None:
-        if isinstance(op, n3ml.operators.Operator):
+               op: n3ml.op.Operator) -> None:
+        if isinstance(op, n3ml.op.Operator):
             self.operator.append(op)
 
-    def make_step(self) -> None:
+    def run(self) -> None:
         for op in self.operator:
             op.make_step()

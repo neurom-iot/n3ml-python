@@ -19,5 +19,3 @@ class Source:
         model.signal[self]['output'] = Signal(self.output_size, np.float)
 
         model.add_op(n3ml.operators.Sample(self, model.signal[self]['output']))
-
-        raise NotImplementedError
