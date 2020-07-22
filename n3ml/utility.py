@@ -1,2 +1,0 @@
-def sort(cg):
-    pass
