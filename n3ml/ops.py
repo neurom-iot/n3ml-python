@@ -58,8 +58,9 @@ class SimNeurons(Operator):
 
 
 class Sample(Operator):
-    def __init__(self):
-        pass
+    def __init__(self, state, firing_rate):
+        self.state = state
+        self.firing_rate = firing_rate
 
     def make_step(self):
         pass

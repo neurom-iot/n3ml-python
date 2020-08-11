@@ -1,3 +1,4 @@
 .idea/*
-n3ml/main.py
+main.py
 n3ml/__pycache__
+n3ml/frontend/__pycache__

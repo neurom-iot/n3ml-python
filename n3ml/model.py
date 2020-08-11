@@ -1,4 +1,5 @@
 import n3ml.ops
+import n3ml.model
 
 
 class Model:
