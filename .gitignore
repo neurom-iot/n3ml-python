@@ -1,4 +1,5 @@
 .idea/*
 main.py
 n3ml/__pycache__
-n3ml/frontend/__pycache__
+n3ml/tests/__pycache__
+data
