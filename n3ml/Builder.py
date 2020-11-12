@@ -30,12 +30,14 @@ def build_network(model, network):
 
     model.add_op(UpdateTime(current_time=model.signal['current_time']))
 
-    for obj in network.component:
+    for obj in network.source + network.population:
         if isinstance(obj, Source):
             build_mnistsource(model, obj)
         elif isinstance(obj, Population):
             build_srmpopulation(model, obj)
-        elif isinstance(obj, Connection):
+
+    for obj in network.connection:
+        if isinstance(obj, Connection):
             build_connection(model, obj)
 
     if network.learning:
@@ -54,7 +56,13 @@ def build_mnistsource(model, mnistsource):
     model.signal[mnistsource]['image'] = np.array(mnistsource.images[model.signal[mnistsource]['data_index']])
     model.signal[mnistsource]['spike_time'] = np.zeros(
         shape=(mnistsource.rows * mnistsource.cols, mnistsource.num_neurons))
+    # TODO: This implementation can be improved for consistency.
+    #       For example, in multiple sources, we need ideas to manage multiple periods
+    #       to simulate properly.
+    model.signal['sampling_period'] = model.signal[mnistsource]['sampling_period']
+    model.signal['current_period'] = model.signal[mnistsource]['current_period']
 
+    # Fill nan values to spike time to represent not-to-fire
     model.signal[mnistsource]['spike_time'].fill(model.nan)
 
     model.add_op(UpdatePeriodAndImage(current_period=model.signal[mnistsource]['current_period'],
@@ -79,8 +87,10 @@ def build_srmpopulation(model, srmpopulation):
     model.signal[srmpopulation] = {}
 
     model.signal[srmpopulation]['membrane_potential'] = np.zeros(shape=srmpopulation.num_neurons)
-    model.signal[srmpopulation]['spike_time'] = np.zeros(
-        shape=srmpopulation.num_neurons).fill(model.nan)
+    model.signal[srmpopulation]['spike_time'] = np.zeros(shape=srmpopulation.num_neurons)
+
+    # Fill nan values to spike time to represent not-to-fire
+    model.signal[srmpopulation]['spike_time'].fill(model.nan)
 
     model.add_op(SpikeTime(membrane_potential=model.signal[srmpopulation]['membrane_potential'],
                            spike_time=model.signal[srmpopulation]['spike_time'],
@@ -89,8 +99,10 @@ def build_srmpopulation(model, srmpopulation):
 
 
 def build_connection(model, connection):
+    import numpy as np
     from n3ml.Source import Source
     from n3ml.Population import Population
+    from n3ml.Operators import SpikeResponse, MatMul
 
     if isinstance(connection.pre, Population):
         pre_num_neurons = connection.pre.num_neurons
@@ -104,9 +116,17 @@ def build_connection(model, connection):
 
     model.signal[connection] = {}
 
+    model.signal[connection]['spike_response'] = np.zeros(shape=pre_num_neurons)
     # TODO: How to initialise synaptic weight?
     model.signal[connection]['synaptic_weight'] = np.zeros(shape=(post_num_neurons, pre_num_neurons))
 
+    model.add_op(SpikeResponse(current_period=model.signal['current_period'],
+                               spike_time=model.signal[connection.pre]['spike_time'],
+                               spike_response=model.signal[connection]['spike_response']))
+
+    model.add_op(MatMul(weight_matrix=model.signal[connection]['synaptic_weight'],
+                        inp_vector=model.signal[connection]['spike_response'],
+                        out_vector=model.signal[connection.post]['membrane_potential']))
 
 
 def build_spikeprop(model, network):

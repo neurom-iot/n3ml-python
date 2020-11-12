@@ -7,11 +7,14 @@ class Operator:
 
 
 class MatMul(Operator):
-    def __init__(self):
-        pass
+    def __init__(self, weight_matrix, inp_vector, out_vector):
+        self.weight_matrix = weight_matrix
+        self.inp_vector = inp_vector
+        self.out_vector = out_vector
 
     def __call__(self, *args, **kwargs):
-        pass
+        import numpy as np
+        self.out_vector = np.matmul(self.weight_matrix, self.inp_vector)
 
 
 class UpdateTime(Operator):
@@ -101,6 +104,40 @@ class PopulationEncode(Operator):
         spike_time = spike_time * -1.0
         spike_time = round(spike_time)
         return spike_time
+
+
+class SpikeResponse(Operator):
+    """Compute spike responses
+
+    Compute spike responses using current time in a period and
+    firing times from presynaptic neurons.
+
+    """
+    def __init__(self,
+                 current_period,
+                 spike_time,
+                 spike_response,
+                 tau=1.0):
+        # inputs
+        self.current_period = current_period
+        self.spike_time = spike_time
+        # output
+        self.spike_response = spike_response
+        # hyperparams
+        self.tau = tau
+
+    def __call__(self, *args, **kwargs):
+        if len(self.spike_time.shape) > 1:
+            spike_time = self.spike_time.flatten()
+        else:
+            spike_time = self.spike_time
+
+        t = self.current_period - spike_time
+        x = t / self.tau
+        import numpy as np
+        y = np.exp(1 - x)
+        y = x * y
+        self.spike_response = y
 
 
 if __name__ == '__main__':
