@@ -11,3 +11,8 @@ class LIFPopulation(Population):
 class SRMPopulation(Population):
     def __init__(self, num_neurons):
         super().__init__(num_neurons)
+
+
+class Processing(Population):
+    def __init__(self, num_neurons):
+        super().__init__(num_neurons)

@@ -15,7 +15,11 @@ class Simulator:
             Builder.build(self.model, network)
 
     def run(self, simulation_time=2):
+        import time
         num_steps = int(simulation_time / self.time_step)
         for step in range(num_steps):
             for op in self.model.operator:
+                start_time = time.time()
                 op()
+                print("Operator: {} - {}s seconds---".format(op, time.time() - start_time))
+

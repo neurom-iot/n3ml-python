@@ -25,6 +25,32 @@ class UpdateTime(Operator):
         self.current_time += 1
 
 
+class UpdatePeriod(Operator):
+    def __init__(self,
+                 current_period,
+                 sampling_period):
+        self.current_period = current_period
+        self.sampling_period = sampling_period
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period < self.sampling_period:
+            self.current_period += 1
+        else:
+            self.current_period = 0
+
+
+class SampleImage(Operator):
+    def __init__(self,
+                 image,
+                 data_index,
+                 num_images,
+                 images):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        pass
+
+
 class SpikeTime(Operator):
     def __init__(self,
                  membrane_potential,
@@ -57,12 +83,14 @@ class UpdatePeriodAndImage(Operator):
         self.images = images
 
     def __call__(self, *args, **kwargs):
+        import numpy as np
         if self.current_period < self.sampling_period:
             self.current_period += 1
         else:
             self.data_index = np.random.randint(0, self.num_images)
             self.image = self.images[self.data_index]
             self.current_period = 0
+            import matplotlib.pyplot as plt
 
 
 class PopulationEncode(Operator):
@@ -138,6 +166,39 @@ class SpikeResponse(Operator):
         y = np.exp(1 - x)
         y = x * y
         self.spike_response = y
+
+
+class RMSE(Operator):
+    def __init__(self,
+                 prediction,
+                 target,
+                 error,
+                 nan=-1):
+        # inputs
+        self.prediction = prediction
+        self.target = target
+        # output
+        self.error = error
+        # hyperparameter
+        self.nan = nan
+
+    def __call__(self, *args, **kwargs):
+        y_ = self.prediction[self.prediction > self.nan]
+        y = self.target[self.prediction > self.nan]
+        error = y_ - y
+        error = error ** 2
+        import numpy as np
+        error = np.sum(error)
+        error = error / 2.0
+        self.error = error
+
+
+class UpdatePeriodAndLabel(Operator):
+    def __init__(self):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        pass
 
 
 if __name__ == '__main__':

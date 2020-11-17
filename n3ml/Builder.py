@@ -40,6 +40,7 @@ def build_network(model, network):
         if isinstance(obj, Connection):
             build_connection(model, obj)
 
+    # TODO: We're going to design multiple learning algorithms in a single network.
     if network.learning:
         build_spikeprop(model, network)
 
@@ -71,6 +72,7 @@ def build_mnistsource(model, mnistsource):
                                       sampling_period=model.signal[mnistsource]['sampling_period'],
                                       num_images=mnistsource.num_images,
                                       images=mnistsource.images))
+
     model.add_op(PopulationEncode(image=model.signal[mnistsource]['image'],
                                   spike_time=model.signal[mnistsource]['spike_time'],
                                   num_neurons=mnistsource.num_neurons,
@@ -111,7 +113,7 @@ def build_connection(model, connection):
     else:
         raise ValueError
 
-    # Assume that postsynaptic object always is an object of Population class
+    # Assume that postsynaptic object is always an object of Population class
     post_num_neurons = connection.post.num_neurons
 
     model.signal[connection] = {}
@@ -130,7 +132,28 @@ def build_connection(model, connection):
 
 
 def build_spikeprop(model, network):
-    pass
+    """Create the operators and the tensors of the backpropagation of SpikeProp
+
+    :param model:
+    :param network:
+    :return:
+    """
+    import numpy as np
+    from n3ml.Operators import RMSE, UpdatePeriodAndLabel
+
+    learning = network.learning
+
+    model.signal[learning] = {}
+
+    model.signal[learning]['prediction'] = model.signal[network.population[-1]]['spike_time']
+    model.signal[learning]['target'] = np.zeros(shape=network.population[-1].num_neurons)
+    model.signal[learning]['error'] = np.array([0.0])
+
+    model.add_op(UpdatePeriodAndLabel())
+
+    model.add_op(RMSE(prediction=model.signal[learning]['prediction'],
+                      target=model.signal[learning]['target'],
+                      error=model.signal[learning]['error']))
 
 
 if __name__ == '__main__':
