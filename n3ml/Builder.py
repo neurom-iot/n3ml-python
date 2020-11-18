@@ -23,12 +23,14 @@ def build_network(model, network):
     from n3ml.Source import Source
     from n3ml.Connection import Connection
     from n3ml.Population import Population
-    from n3ml.Operators import UpdateTime
+    from n3ml.Operators import UpdateTime, UpdatePeriod
 
     model.signal['threshold'] = np.array(network.threshold)
     model.signal['current_time'] = np.array(0)
+    model.signal['current_period'] = np.array(0)
 
     model.add_op(UpdateTime(current_time=model.signal['current_time']))
+    model.add_op(UpdatePeriod(current_period=model.signal['current_period']))
 
     for obj in network.source + network.population:
         if isinstance(obj, Source):
@@ -46,40 +48,37 @@ def build_network(model, network):
 
 
 def build_mnistsource(model, mnistsource):
-    import numpy as np
-    from n3ml.Operators import UpdatePeriodAndImage, PopulationEncode
 
     model.signal[mnistsource] = {}
 
-    model.signal[mnistsource]['sampling_period'] = np.array(mnistsource.sampling_period)
-    model.signal[mnistsource]['current_period'] = np.array(0)
-    model.signal[mnistsource]['data_index'] = np.array(np.random.randint(0, mnistsource.num_images))
-    model.signal[mnistsource]['image'] = np.array(mnistsource.images[model.signal[mnistsource]['data_index']])
-    model.signal[mnistsource]['spike_time'] = np.zeros(
-        shape=(mnistsource.rows * mnistsource.cols, mnistsource.num_neurons))
-    # TODO: This implementation can be improved for consistency.
-    #       For example, in multiple sources, we need ideas to manage multiple periods
-    #       to simulate properly.
-    model.signal['sampling_period'] = model.signal[mnistsource]['sampling_period']
-    model.signal['current_period'] = model.signal[mnistsource]['current_period']
+    if mnistsource.code == 'population':
+        import numpy as np
+        import n3ml.Operators as Operators
 
-    # Fill nan values to spike time to represent not-to-fire
-    model.signal[mnistsource]['spike_time'].fill(model.nan)
+        model.signal[mnistsource]['image'] = np.zeros(
+            shape=(mnistsource.rows, mnistsource.cols))
+        model.signal[mnistsource]['image_index'] = np.array(0)
+        model.signal[mnistsource]['spike_time'] = np.zeros(
+            shape=(mnistsource.rows * mnistsource.cols, mnistsource.num_neurons))
 
-    model.add_op(UpdatePeriodAndImage(current_period=model.signal[mnistsource]['current_period'],
-                                      image=model.signal[mnistsource]['image'],
-                                      data_index=model.signal[mnistsource]['data_index'],
-                                      sampling_period=model.signal[mnistsource]['sampling_period'],
-                                      num_images=mnistsource.num_images,
-                                      images=mnistsource.images))
-
-    model.add_op(PopulationEncode(image=model.signal[mnistsource]['image'],
-                                  spike_time=model.signal[mnistsource]['spike_time'],
-                                  num_neurons=mnistsource.num_neurons,
-                                  sampling_period=mnistsource.sampling_period,
-                                  beta=mnistsource.beta,
-                                  min_value=mnistsource.min_value,
-                                  max_value=mnistsource.max_value))
+        model.add_op(Operators.InitSpikeTime(spike_time=model.signal[mnistsource]['spike_time'],
+                                             current_period=model['current_period'],
+                                             value=model.nan))
+        model.add_op(Operators.SampleImage(image=model.signal[mnistsource]['image'],
+                                           image_index=model.signal[mnistsource]['image_index'],
+                                           current_period=model.signal['current_period'],
+                                           sampling_period=mnistsource.sampling_period,
+                                           num_images=mnistsource.num_images,
+                                           images=mnistsource.images))
+        model.add_op(Operators.PopulationEncode(image=model.signal[mnistsource]['image'],
+                                                spike_time=model.signal[mnistsource]['spike_time'],
+                                                num_neurons=mnistsource.num_neurons,
+                                                sampling_period=mnistsource.sampling_period,
+                                                beta=mnistsource.beta,
+                                                min_value=mnistsource.min_value,
+                                                max_value=mnistsource.max_value))
+    elif mnistsource.code == 'poisson':
+        raise NotImplementedError
 
 
 def build_srmpopulation(model, srmpopulation):

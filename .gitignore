@@ -1,5 +1,7 @@
 .idea/*
 main.py
+main_stdp.py
+main_spikeprop.py
 n3ml/__pycache__
 n3ml/tests/__pycache__
 data

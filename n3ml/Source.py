@@ -5,9 +5,16 @@ class Source:
 
 
 class MNISTSource(Source):
-    def __init__(self, code, num_neurons, sampling_period=10, beta=1.0):
+    def __init__(self,
+                 code,
+                 num_neurons=None,
+                 sampling_period=10,
+                 beta=1.0):
         super().__init__('mnist', code)
-        self.num_neurons = num_neurons
+        if code == 'poisson':
+            self.num_neurons = 28 * 28
+        elif code == 'population':
+            self.num_neurons = num_neurons
         self.sampling_period = sampling_period
         self.beta = beta
         self.min_value = 0.0

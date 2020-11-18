@@ -6,6 +6,22 @@ class Operator:
         raise NotImplementedError
 
 
+class InitSpikeTime(Operator):
+    def __init__(self,
+                 spike_time,
+                 current_period,
+                 value):
+        # Signals
+        self.spike_time = spike_time
+        self.current_period = current_period
+        #
+        self.value = value
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == 0:
+            self.spike_time.fill(self.value)
+
+
 class MatMul(Operator):
     def __init__(self, weight_matrix, inp_vector, out_vector):
         self.weight_matrix = weight_matrix
@@ -42,10 +58,19 @@ class UpdatePeriod(Operator):
 class SampleImage(Operator):
     def __init__(self,
                  image,
-                 data_index,
+                 image_index,
+                 current_period,
+                 sampling_period,
                  num_images,
                  images):
-        pass
+        # signals
+        self.image = image
+        self.image_index = image_index
+        self.current_period = current_period
+        #
+        self.sampling_period = sampling_period
+        self.num_images = num_images
+        self.images = images
 
     def __call__(self, *args, **kwargs):
         pass
