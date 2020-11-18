@@ -159,6 +159,28 @@ class PopulationEncode(Operator):
         return spike_time
 
 
+class PoissonSpikeGeneration(Operator):
+    def __init__(self,
+                 image,
+                 spike_time,
+                 firing_rate=74.5,
+                 time_step=0.001):
+        # signals
+        self.image = image
+        self.spike_time = spike_time
+        #
+        self.firing_rate = firing_rate
+        self.time_step = time_step
+        self.prob_single_spike = self.firing_rate * self.time_step
+
+    def __call__(self, *args, **kwargs):
+        import numpy as np
+
+        self.spike_time.fill(0)
+        random_number = np.random.uniform(0, 1)
+        self.spike_time[random_number > self.prob_single_spike] = 1
+
+
 class SpikeResponse(Operator):
     """Compute spike responses
 
