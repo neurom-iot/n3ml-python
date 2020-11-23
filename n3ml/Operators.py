@@ -1,6 +1,6 @@
 class Operator:
     def __init__(self):
-        raise NotImplementedError
+        pass
 
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
@@ -22,6 +22,16 @@ class InitSpikeTime(Operator):
             self.spike_time.fill(self.value)
 
 
+class InitWeight(Operator):
+    def __init__(self,
+                 weight,
+                 current_period):
+        super().__init__()
+
+    def __call__(self, *args, **kwargs):
+        pass
+
+
 class MatMul(Operator):
     def __init__(self, weight_matrix, inp_vector, out_vector):
         self.weight_matrix = weight_matrix
@@ -30,7 +40,7 @@ class MatMul(Operator):
 
     def __call__(self, *args, **kwargs):
         import numpy as np
-        self.out_vector = np.matmul(self.weight_matrix, self.inp_vector)
+        self.out_vector[:] = np.matmul(self.weight_matrix, self.inp_vector)
 
 
 class UpdateTime(Operator):
@@ -52,7 +62,7 @@ class UpdatePeriod(Operator):
         if self.current_period < self.sampling_period:
             self.current_period += 1
         else:
-            self.current_period = 0
+            self.current_period.fill(0)
 
 
 class SampleImage(Operator):
@@ -73,7 +83,10 @@ class SampleImage(Operator):
         self.images = images
 
     def __call__(self, *args, **kwargs):
-        pass
+        if self.current_period == 0:
+            import numpy as np
+            self.image_index.fill(np.random.randint(0, self.num_images))
+            self.image[:] = self.images[self.image_index]
 
 
 class SpikeTime(Operator):
@@ -88,34 +101,9 @@ class SpikeTime(Operator):
         self.current_time = current_time
 
     def __call__(self, *args, **kwargs):
-        self.spike_time[self.membrane_potential > self.threshold] = self.current_time
-        self.membrane_potential[self.membrane_potential > self.threshold] = -987654321
-
-
-class UpdatePeriodAndImage(Operator):
-    def __init__(self,
-                 sampling_period,
-                 current_period,
-                 image,
-                 data_index,
-                 num_images,
-                 images):
-        self.sampling_period = sampling_period
-        self.current_period = current_period
-        self.image = image
-        self.data_index = data_index
-        self.num_images = num_images
-        self.images = images
-
-    def __call__(self, *args, **kwargs):
-        import numpy as np
-        if self.current_period < self.sampling_period:
-            self.current_period += 1
-        else:
-            self.data_index = np.random.randint(0, self.num_images)
-            self.image = self.images[self.data_index]
-            self.current_period = 0
-            import matplotlib.pyplot as plt
+        # spike_time 중에서 not-to-fire 상태인 변수에 대해서만 아래 것을 계산하면 된다.
+        self.spike_time[(self.spike_time < 0) & (self.membrane_potential > self.threshold)] = self.current_time
+        self.membrane_potential[self.membrane_potential > self.threshold] = 0
 
 
 class PopulationEncode(Operator):
@@ -159,26 +147,43 @@ class PopulationEncode(Operator):
         return spike_time
 
 
+class UpdateFiringRate(Operator):
+    def __init__(self,
+                 firing_rate,
+                 image,
+                 current_period):
+        super().__init__()
+        # signals
+        self.firing_rate = firing_rate
+        self.image = image
+        self.current_period = current_period
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == 0:
+            flattened_image = self.image.flatten()
+            self.firing_rate[:] = 255.0 * flattened_image / 4.0
+
+
 class PoissonSpikeGeneration(Operator):
     def __init__(self,
                  image,
-                 spike_time,
-                 firing_rate=74.5,
+                 spike,
+                 firing_rate,
                  time_step=0.001):
         # signals
         self.image = image
-        self.spike_time = spike_time
-        #
+        self.spike = spike
         self.firing_rate = firing_rate
+        #
         self.time_step = time_step
-        self.prob_single_spike = self.firing_rate * self.time_step
 
     def __call__(self, *args, **kwargs):
         import numpy as np
 
-        self.spike_time.fill(0)
-        random_number = np.random.uniform(0, 1)
-        self.spike_time[random_number > self.prob_single_spike] = 1
+        self.spike.fill(0)
+        random_number = np.random.uniform(0, 1, self.spike.shape)
+        prob_single_spike = self.firing_rate * self.time_step
+        self.spike[random_number < prob_single_spike] = 1
 
 
 class SpikeResponse(Operator):
@@ -206,13 +211,15 @@ class SpikeResponse(Operator):
             spike_time = self.spike_time.flatten()
         else:
             spike_time = self.spike_time
-
+        # TODO: 여기에 spike_time이 not-to-spike인 -1일
+        #       때에 대한 경우 처리 방법 필요
         t = self.current_period - spike_time
         x = t / self.tau
         import numpy as np
         y = np.exp(1 - x)
         y = x * y
-        self.spike_response = y
+        y[y < 0] = 0
+        self.spike_response[:] = y
 
 
 class RMSE(Operator):
@@ -243,6 +250,21 @@ class RMSE(Operator):
 class UpdatePeriodAndLabel(Operator):
     def __init__(self):
         pass
+
+    def __call__(self, *args, **kwargs):
+        pass
+
+
+class UpdateConductance(Operator):
+    def __init__(self,
+                 conductance,
+                 pre_spike,
+                 post_potential):
+        # signals
+        self.conductance = conductance
+        self.pre_spike = pre_spike
+        #
+        self.post_potential = post_potential
 
     def __call__(self, *args, **kwargs):
         pass

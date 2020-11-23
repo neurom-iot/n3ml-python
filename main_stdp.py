@@ -1,7 +1,7 @@
 from n3ml.Network import Network
 from n3ml.Source import MNISTSource
 from n3ml.Population import Processing
-from n3ml.Connection import Connection
+from n3ml.Connection import STDPConnection
 from n3ml.Simulator import Simulator
 from n3ml.Learning import STDP
 
@@ -12,11 +12,11 @@ if __name__ == '__main__':
 
     pop = Processing(num_neurons=400)
 
-    conn = Connection(src, pop)
+    #conn = STDPConnection(src, pop)
 
     net.add(src)
     net.add(pop)
-    net.add(conn)
+    #net.add(conn)
 
     sim = Simulator(network=net)
 

@@ -22,28 +22,35 @@ def build_network(model, network):
     import numpy as np
     from n3ml.Source import Source
     from n3ml.Connection import Connection
-    from n3ml.Population import Population
+    from n3ml.Population import Population, SRMPopulation, Processing
     from n3ml.Operators import UpdateTime, UpdatePeriod
+    import n3ml.Learning as Learning
 
     model.signal['threshold'] = np.array(network.threshold)
     model.signal['current_time'] = np.array(0)
     model.signal['current_period'] = np.array(0)
 
     model.add_op(UpdateTime(current_time=model.signal['current_time']))
-    model.add_op(UpdatePeriod(current_period=model.signal['current_period']))
+    model.add_op(UpdatePeriod(current_period=model.signal['current_period'],
+                              sampling_period=10))
 
     for obj in network.source + network.population:
         if isinstance(obj, Source):
             build_mnistsource(model, obj)
         elif isinstance(obj, Population):
-            build_srmpopulation(model, obj)
+            if isinstance(obj, SRMPopulation):
+                build_srmpopulation(model, obj)
+            elif isinstance(obj, Processing):
+                build_processing(model, obj)
 
     for obj in network.connection:
         if isinstance(obj, Connection):
             build_connection(model, obj)
 
     # TODO: We're going to design multiple learning algorithms in a single network.
-    if network.learning:
+    if isinstance(network.learning, Learning.STDP):
+        pass
+    elif isinstance(network.learning, Learning.SpikeProp):
         build_spikeprop(model, network)
 
 
@@ -56,9 +63,6 @@ def build_mnistsource(model, mnistsource):
         shape=(mnistsource.rows, mnistsource.cols))
     model.signal[mnistsource]['image_index'] = np.array(0)
 
-    model.add_op(Operators.InitSpikeTime(spike_time=model.signal[mnistsource]['spike_time'],
-                                         current_period=model.signal['current_period'],
-                                         value=model.nan))
     model.add_op(Operators.SampleImage(image=model.signal[mnistsource]['image'],
                                        image_index=model.signal[mnistsource]['image_index'],
                                        current_period=model.signal['current_period'],
@@ -70,6 +74,10 @@ def build_mnistsource(model, mnistsource):
         model.signal[mnistsource]['spike_time'] = np.zeros(
             shape=(mnistsource.rows * mnistsource.cols, mnistsource.num_neurons))
 
+        model.add_op(Operators.InitSpikeTime(spike_time=model.signal[mnistsource]['spike_time'],
+                                             current_period=model.signal['current_period'],
+                                             value=model.nan))
+
         model.add_op(Operators.PopulationEncode(image=model.signal[mnistsource]['image'],
                                                 spike_time=model.signal[mnistsource]['spike_time'],
                                                 num_neurons=mnistsource.num_neurons,
@@ -78,29 +86,37 @@ def build_mnistsource(model, mnistsource):
                                                 min_value=mnistsource.min_value,
                                                 max_value=mnistsource.max_value))
     elif mnistsource.code == 'poisson':
-        model.signal[mnistsource]['spike_time'] = np.zeros(
+        model.signal[mnistsource]['firing_rate'] = np.zeros(
+            shape=(mnistsource.rows * mnistsource.cols))
+        model.signal[mnistsource]['spike'] = np.zeros(
             shape=(mnistsource.rows * mnistsource.cols))
 
+        model.add_op(Operators.UpdateFiringRate(firing_rate=model.signal[mnistsource]['firing_rate'],
+                                                image=model.signal[mnistsource]['image'],
+                                                current_period=model.signal['current_period']))
+
         model.add_op(Operators.PoissonSpikeGeneration(image=model.signal[mnistsource]['image'],
-                                                      spike_time=model.signal[mnistsource]['spike_time']))
+                                                      spike=model.signal[mnistsource]['spike'],
+                                                      firing_rate=model.signal[mnistsource]['firing_rate']))
 
 
 def build_srmpopulation(model, srmpopulation):
     import numpy as np
-    from n3ml.Operators import SpikeTime
+    import n3ml.Operators as Operators
 
     model.signal[srmpopulation] = {}
 
     model.signal[srmpopulation]['membrane_potential'] = np.zeros(shape=srmpopulation.num_neurons)
     model.signal[srmpopulation]['spike_time'] = np.zeros(shape=srmpopulation.num_neurons)
 
-    # Fill nan values to spike time to represent not-to-fire
-    model.signal[srmpopulation]['spike_time'].fill(model.nan)
+    model.add_op(Operators.InitSpikeTime(spike_time=model.signal[srmpopulation]['spike_time'],
+                                         current_period=model.signal['current_period'],
+                                         value=model.nan))
 
-    model.add_op(SpikeTime(membrane_potential=model.signal[srmpopulation]['membrane_potential'],
-                           spike_time=model.signal[srmpopulation]['spike_time'],
-                           threshold=model.signal['threshold'],
-                           current_time=model.signal['current_time']))
+    model.add_op(Operators.SpikeTime(membrane_potential=model.signal[srmpopulation]['membrane_potential'],
+                                     spike_time=model.signal[srmpopulation]['spike_time'],
+                                     threshold=model.signal['threshold'],
+                                     current_time=model.signal['current_time']))
 
 
 def build_connection(model, connection):
@@ -123,7 +139,7 @@ def build_connection(model, connection):
 
     model.signal[connection]['spike_response'] = np.zeros(shape=pre_num_neurons)
     # TODO: How to initialise synaptic weight?
-    model.signal[connection]['synaptic_weight'] = np.zeros(shape=(post_num_neurons, pre_num_neurons))
+    model.signal[connection]['synaptic_weight'] = np.ones(shape=(post_num_neurons, pre_num_neurons))
 
     model.add_op(SpikeResponse(current_period=model.signal['current_period'],
                                spike_time=model.signal[connection.pre]['spike_time'],
@@ -132,6 +148,32 @@ def build_connection(model, connection):
     model.add_op(MatMul(weight_matrix=model.signal[connection]['synaptic_weight'],
                         inp_vector=model.signal[connection]['spike_response'],
                         out_vector=model.signal[connection.post]['membrane_potential']))
+
+
+def build_processing(model, processing):
+    import numpy as np
+    from n3ml.Operators import *
+
+    model.signal[processing] = {}
+
+    # for excitatory neurons
+    model.signal[processing]['v_exc'] = np.zeros(shape=(processing.num_neurons))
+    model.signal[processing]['s_exc'] = np.zeros(shape=(processing.num_neurons))
+    # for inhibitory neurons
+    model.signal[processing]['v_inh'] = np.zeros(shape=(processing.num_neurons))
+    model.signal[processing]['s_inh'] = np.zeros(shape=(processing.num_neurons))
+    # for the conductances of synapses
+    model.signal[processing]['weight_e'] = np.zeros(
+        shape=(processing.num_neurons, processing.num_neurons))
+    model.signal[processing]['g_e'] = np.zeros(
+        shape=(processing.num_neurons, processing.num_neurons))
+    model.signal[processing]['weigh_i'] = np.zeros(
+        shape=(processing.num_neurons, processing.num_neurons))
+    model.signal[processing]['g_i'] = np.zeros(
+        shape=(processing.num_neurons, processing.num_neurons))
+
+    InitWeight()
+
 
 
 def build_spikeprop(model, network):
