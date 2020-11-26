@@ -25,23 +25,23 @@ class InitSpikeTime(Operator):
 class InitWeight(Operator):
     def __init__(self,
                  weight,
-                 current_period,
+                 current_time,
                  value=None,
                  random_process=None):
         super().__init__()
         # signals
         self.weight = weight
-        self.current_period = current_period
+        self.current_time = current_time
         #
         self.value = value
         self.random_process = random_process
 
     def __call__(self, *args, **kwargs):
-        if self.current_period == 0:
+        if self.current_time == 0:
             if self.value is not None:
                 self.weight *= self.value
             elif self.random_process is not None:
-                pass
+                self.weight[:] = self.random_process(-1, 1, self.weight.shape)
 
 
 class MatMul(Operator):
@@ -106,15 +106,15 @@ class SpikeTime(Operator):
                  membrane_potential,
                  spike_time,
                  threshold,
-                 current_time):
+                 current_period):
         self.membrane_potential = membrane_potential
         self.spike_time = spike_time
         self.threshold = threshold
-        self.current_time = current_time
+        self.current_period = current_period
 
     def __call__(self, *args, **kwargs):
         # spike_time 중에서 not-to-fire 상태인 변수에 대해서만 아래 것을 계산하면 된다.
-        self.spike_time[(self.spike_time < 0) & (self.membrane_potential > self.threshold)] = self.current_time
+        self.spike_time[(self.spike_time < 0) & (self.membrane_potential > self.threshold)] = self.current_period
         self.membrane_potential[self.membrane_potential > self.threshold] = 0
 
 
@@ -230,7 +230,7 @@ class SpikeResponse(Operator):
         import numpy as np
         y = np.exp(1 - x)
         y = x * y
-        y[y < 0] = 0
+        y[(spike_time < 0) | (y < 0)] = 0
         self.spike_response[:] = y
 
 

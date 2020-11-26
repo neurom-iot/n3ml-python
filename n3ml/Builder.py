@@ -116,14 +116,14 @@ def build_srmpopulation(model, srmpopulation):
     model.add_op(Operators.SpikeTime(membrane_potential=model.signal[srmpopulation]['membrane_potential'],
                                      spike_time=model.signal[srmpopulation]['spike_time'],
                                      threshold=model.signal['threshold'],
-                                     current_time=model.signal['current_time']))
+                                     current_period=model.signal['current_period']))
 
 
 def build_connection(model, connection):
     import numpy as np
     from n3ml.Source import Source
     from n3ml.Population import Population
-    from n3ml.Operators import SpikeResponse, MatMul
+    from n3ml.Operators import SpikeResponse, MatMul, InitWeight
 
     if isinstance(connection.pre, Population):
         pre_num_neurons = connection.pre.num_neurons
@@ -139,7 +139,11 @@ def build_connection(model, connection):
 
     model.signal[connection]['spike_response'] = np.zeros(shape=pre_num_neurons)
     # TODO: How to initialise synaptic weight?
-    model.signal[connection]['synaptic_weight'] = np.ones(shape=(post_num_neurons, pre_num_neurons))
+    model.signal[connection]['synaptic_weight'] = np.zeros(shape=(post_num_neurons, pre_num_neurons))
+
+    model.add_op(InitWeight(weight=model.signal[connection]['synaptic_weight'],
+                            current_time=model.signal['current_period'],
+                            random_process=np.random.uniform))
 
     model.add_op(SpikeResponse(current_period=model.signal['current_period'],
                                spike_time=model.signal[connection.pre]['spike_time'],
