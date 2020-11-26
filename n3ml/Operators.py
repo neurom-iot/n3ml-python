@@ -25,11 +25,23 @@ class InitSpikeTime(Operator):
 class InitWeight(Operator):
     def __init__(self,
                  weight,
-                 current_period):
+                 current_period,
+                 value=None,
+                 random_process=None):
         super().__init__()
+        # signals
+        self.weight = weight
+        self.current_period = current_period
+        #
+        self.value = value
+        self.random_process = random_process
 
     def __call__(self, *args, **kwargs):
-        pass
+        if self.current_period == 0:
+            if self.value is not None:
+                self.weight *= self.value
+            elif self.random_process is not None:
+                pass
 
 
 class MatMul(Operator):
@@ -259,31 +271,65 @@ class UpdateConductance(Operator):
     def __init__(self,
                  conductance,
                  pre_spike,
-                 post_potential):
+                 weight,
+                 init_value,
+                 latest_firing_time,
+                 simulation_time,
+                 time_constant):
+        self.conductance = conductance
+        self.pre_spike = pre_spike
+        self.weight = weight
+        self.init_value = init_value
+        self.latest_firing_time = latest_firing_time
+        self.simultation_time = simulation_time
+        self.time_constant = time_constant
+
+    def __call__(self, *args, **kwargs):
+        # pre_spike == 0
+        self.latest_firing_time[self.pre_spike == 0] - self.simultation_time
+
+        # pre_spike == 1
+
+
+class _UpdateConductance(Operator):
+    def __init__(self,
+                 conductance,
+                 pre_spike,
+                 weight,
+                 post_potential,
+                 time_step=0.001):
         # signals
         self.conductance = conductance
         self.pre_spike = pre_spike
+        self.weight = weight
         #
         self.post_potential = post_potential
+        self.time_step = time_step
 
     def __call__(self, *args, **kwargs):
-        pass
+        [self.pre_spike == 1]
 
 
 if __name__ == '__main__':
     import numpy as np
-    from n3ml.Signal import Signal
 
-    mp = Signal(data=np.asarray([0.5, 0.8, 1.2, 1.5]))
-    st = Signal(data=np.asarray([0, 0, 0, 0]))
-    th = Signal(data=np.asarray([1]))
-    pt = Signal(data=np.asarray([4]))
+    conductance = np.array([1.0, 2.0, 3.0, 4.0]).reshape((2, 2))
+    weight = np.array([10.0, 5.0, 15.0, 20.0]).reshape((2, 2))
+    init_conductance = np.array([0.0, 0.0, 0.0, 0.0]).reshape((2, 2))
+    pre_spike = np.array([0, 1], dtype=np.int)
+    simulation_time = 0.001
+    time_constant = 0.001
 
-    print(st.data)
-    print(mp.data)
+    print(pre_spike == 0)
+    print(pre_spike)
+    tiled_pre_spike = np.tile(pre_spike, (2, 1))
+    print(tiled_pre_spike)
+    print(tiled_pre_spike == 0)
 
-    op = SpikeTime(mp.data, st.data, th.data, pt.data)
-    op()
+    print(conductance)
+    print(conductance[tiled_pre_spike == 0])
 
-    print(st.data)
-    print(mp.data)
+    conductance[:] = np.multiply(tiled_pre_spike == 0, np.multiply(weight, np.exp(-simulation_time/time_constant)))
+
+    print(conductance)
+

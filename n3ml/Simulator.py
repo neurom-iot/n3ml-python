@@ -29,12 +29,12 @@ class Simulator:
         num_steps = int(simulation_time / self.time_step)
 
         # ops for spikeprop
-        #_ops = self.model.operator[:13]
-        #ops = transpose(_ops, [4, 5, 7, 2, 3, 9, 10, 6, 11, 12, 8, 0, 1])
+        _ops = self.model.operator[:13]
+        ops = transpose(_ops, [4, 5, 7, 2, 3, 9, 10, 6, 11, 12, 8, 0, 1])
 
         # ops for stdp
-        _ops = self.model.operator[:5]
-        ops = transpose(_ops, [2, 3, 4, 0, 1])
+        #_ops = self.model.operator[:5]
+        #ops = transpose(_ops, [2, 3, 4, 0, 1])
 
         for step in range(num_steps):
             self._run_step(ops)

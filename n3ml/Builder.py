@@ -152,7 +152,7 @@ def build_connection(model, connection):
 
 def build_processing(model, processing):
     import numpy as np
-    from n3ml.Operators import *
+    import n3ml.Operators as Operators
 
     model.signal[processing] = {}
 
@@ -163,16 +163,30 @@ def build_processing(model, processing):
     model.signal[processing]['v_inh'] = np.zeros(shape=(processing.num_neurons))
     model.signal[processing]['s_inh'] = np.zeros(shape=(processing.num_neurons))
     # for the conductances of synapses
-    model.signal[processing]['weight_e'] = np.zeros(
-        shape=(processing.num_neurons, processing.num_neurons))
+    model.signal[processing]['weight_e'] = np.identity(n=processing.num_neurons)
     model.signal[processing]['g_e'] = np.zeros(
         shape=(processing.num_neurons, processing.num_neurons))
-    model.signal[processing]['weigh_i'] = np.zeros(
-        shape=(processing.num_neurons, processing.num_neurons))
+    model.signal[processing]['weight_i'] = np.subtract(
+        np.ones(shape=(processing.num_neurons, processing.num_neurons)),
+        np.identity(n=processing.num_neurons))
     model.signal[processing]['g_i'] = np.zeros(
         shape=(processing.num_neurons, processing.num_neurons))
 
-    InitWeight()
+    Operators.InitWeight(weight=model.signal[processing]['weight_e'],
+                         current_period=model.signal['current_period'],
+                         value=10.4)
+    Operators.InitWeight(weight=model.signal[processing]['weight_i'],
+                         current_period=model.signal['current_period'],
+                         value=17.0)
+
+    Operators.UpdateConductance(conductance=model.signal[processing]['g_e'],
+                                pre_spike=model.signal[processing]['s_exc'],
+                                weight=model.signal[processing]['weight_e'],
+                                post_potential=0.01)    # time constant: 10ms
+    Operators.UpdateConductance(conductance=model.signal[processing]['g_i'],
+                                pre_spike=model.signal[processing]['s_inh'],
+                                weight=model.signal[processing]['weight_i'],
+                                post_potential=0.02)    # time constant: 20ms
 
 
 
