@@ -138,7 +138,6 @@ def build_connection(model, connection):
     model.signal[connection] = {}
 
     model.signal[connection]['spike_response'] = np.zeros(shape=pre_num_neurons)
-    # TODO: How to initialise synaptic weight?
     model.signal[connection]['synaptic_weight'] = np.zeros(shape=(post_num_neurons, pre_num_neurons))
 
     model.add_op(InitWeight(weight=model.signal[connection]['synaptic_weight'],

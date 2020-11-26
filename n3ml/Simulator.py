@@ -50,6 +50,11 @@ class Simulator:
         # self._run_step(ops)
         # self._run_step(ops)
 
+        logger = {
+            'image': [],
+            'pred': []
+        }
+
         print("time: 0 - period: 0")
 
         for step in range(num_steps):
@@ -57,20 +62,34 @@ class Simulator:
 
             print(self.model.signal[self.network.population[0]]['spike_time'])
             print(self.model.signal[self.network.population[1]]['spike_time'])
-            plt.imshow(self.model.signal[self.network.source[0]]['image'])
-            plt.show()
 
-            print(
-                "time: {} - period: {}".format(self.model.signal['current_time'], self.model.signal['current_period']))
+            print("time: {} - period: {}".format(self.model.signal['current_time'], self.model.signal['current_period']))
 
-            #for op in self.model.operator:
-                #start_time = time.time()
-                #op()
-                #print("Operator: {} - {}s seconds---".format(op, time.time() - start_time))
-            #print("time: {} ms - period: {} ms".format(
-                #self.model.signal['current_time'], self.model.signal['current_period']))
-            #plt.imshow(self.model.signal[self.network.source[0]]['image'])
-            #plt.show()
+            if self.model.signal['current_period'] != 0 and self.model.signal['current_period'] % 10 == 0:
+                # Record an image and spikes after each period
+                logger['image'].append(
+                    np.array(self.model.signal[self.network.source[0]]['image']))
+                logger['pred'].append(
+                    np.array(self.model.signal[self.network.population[1]]['spike_time']))
+
+        print("# images: {}".format(len(logger['image'])))
+
+        # Visualize recorded data
+        sampling_period = 10
+        num_neurons = 10
+        num_periods = len(logger['image'])
+        spikes = np.zeros(shape=(sampling_period * num_periods, num_neurons))
+
+        # Generate spikes from spike times
+        for p in range(num_periods):
+            for i, v in enumerate(logger['pred'][p]):
+                if -1 < v < 10:
+                    spikes[int(v)+p*10, i] = 1
+
+        print(spikes)
+
+        from n3ml.Visualizer import plot_result
+        plot_result(logger['image'], spikes)
 
     def _run_step(self, ops):
         for op in ops:
