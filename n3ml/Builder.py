@@ -201,21 +201,64 @@ def build_spikeprop(model, network):
     :return:
     """
     import numpy as np
-    from n3ml.Operators import RMSE, UpdatePeriodAndLabel
+    from n3ml.Operators import RMSE, UpdateLabel, UpdateTarget
+    from n3ml.Operators import ComputeOutputUpstreamGradient
+    from n3ml.Operators import ComputeHiddenUpstreamGradient
+    from n3ml.Operators import ComputeOutputGradient
+    from n3ml.Operators import ComputeHiddenGradient
 
     learning = network.learning
 
     model.signal[learning] = {}
 
+    model.signal[learning]['label'] = np.array([0])
+    # TODO: Modify the arguement 'shape' using num_classes for consistency
+    model.signal[learning]['target'] = np.zeros(shape=(10))
     model.signal[learning]['prediction'] = model.signal[network.population[-1]]['spike_time']
-    model.signal[learning]['target'] = np.zeros(shape=network.population[-1].num_neurons)
     model.signal[learning]['error'] = np.array([0.0])
+    model.signal[learning]['output_upstream_gradient'] = np.zeros(shape=(10))
+    model.signal[learning]['hidden_upstream_gradient'] = np.zeros(shape=(100))
+    model.signal[learning]['output_gradient'] = np.zeros(shape=())
+    model.signal[learning]['hidden_gradient'] = np.zeros(shape=())
 
-    model.add_op(UpdatePeriodAndLabel())
+    model.add_op(UpdateLabel(label=model.signal[learning]['label'],
+                             label_index=model.signal[network.source[0]]['image_index'],
+                             labels=network.source[0].labels,
+                             current_period=model.signal['current_period'],
+                             sampling_period=network.source[0].sampling_period))
+
+    model.add_op(UpdateTarget(target=model.signal[learning]['target'],
+                              label=model.signal[learning]['label'],
+                              current_period=model.signal['current_period'],
+                              sampling_period=network.source[0].sampling_period))
 
     model.add_op(RMSE(prediction=model.signal[learning]['prediction'],
                       target=model.signal[learning]['target'],
-                      error=model.signal[learning]['error']))
+                      error=model.signal[learning]['error'],
+                      current_period=model.signal['current_period'],
+                      sampling_period=network.source[0].sampling_period))
+
+    model.add_op(ComputeOutputUpstreamGradient(gradient=model.signal[learning]['output_upstream_gradient'],
+                                               prediction=model.signal[learning]['prediction'],
+                                               target=model.signal[learning]['target'],
+                                               weights=model.signal[network.connection[1]]['synaptic_weight'],
+                                               pre_spike_time=model.signal[network.population[0]]['spike_time'],
+                                               current_period=model.signal['current_period'],
+                                               sampling_period=network.source[0].sampling_period))
+
+    model.add_op(ComputeHiddenUpstreamGradient(upstream_gradient=model.signal[learning]['hidden_upstream_gradient'],
+                                               pre_upstream_gradient=model.signal[learning]['output_upstream_gradient'],
+                                               post_spike_time=model.signal[learning]['prediction'],
+                                               spike_time=model.signal[network.population[0]]['spike_time'],
+                                               pre_spike_time=model.signal[network.source[0]]['spike_time'],
+                                               post_weights=model.signal[network.connection[1]]['synaptic_weight'],
+                                               pre_weights=model.signal[network.connection[0]]['synaptic_weight'],
+                                               current_period=model.signal['current_period'],
+                                               sampling_period=network.source[0].sampling_period))
+
+    model.add_op(ComputeOutputGradient())
+
+    model.add_op(ComputeHiddenGradient())
 
 
 if __name__ == '__main__':

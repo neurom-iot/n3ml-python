@@ -77,6 +77,45 @@ class UpdatePeriod(Operator):
             self.current_period.fill(0)
 
 
+class UpdateLabel(Operator):
+    def __init__(self,
+                 label,
+                 label_index,
+                 labels,
+                 current_period,
+                 sampling_period):
+        # Signals
+        self.label = label
+        self.label_index = label_index
+        self.current_period = current_period
+        #
+        self.sampling_period = sampling_period
+        self.labels = labels
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == self.sampling_period:
+            self.label[0] = self.labels[self.label_index]
+
+
+class UpdateTarget(Operator):
+    def __init__(self,
+                 target,
+                 label,
+                 current_period,
+                 sampling_period):
+        # signals
+        self.target = target
+        self.label = label
+        self.current_period = current_period
+        #
+        self.sampling_period = sampling_period
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == self.sampling_period:
+            self.target.fill(self.sampling_period)
+            self.target[self.label] = 0.0
+
+
 class SampleImage(Operator):
     def __init__(self,
                  image,
@@ -239,27 +278,164 @@ class RMSE(Operator):
                  prediction,
                  target,
                  error,
+                 current_period,
+                 sampling_period,
                  nan=-1):
         # inputs
         self.prediction = prediction
         self.target = target
+        self.current_period = current_period
         # output
         self.error = error
+        self.sampling_period = sampling_period
         # hyperparameter
         self.nan = nan
 
     def __call__(self, *args, **kwargs):
-        y_ = self.prediction[self.prediction > self.nan]
-        y = self.target[self.prediction > self.nan]
-        error = y_ - y
-        error = error ** 2
+        if self.current_period == self.sampling_period:
+            y_ = self.prediction[self.prediction > self.nan]
+            y = self.target[self.prediction > self.nan]
+            error = y_ - y
+            error = error ** 2
+            import numpy as np
+            error = np.sum(error)
+            error = error / 2.0
+            self.error[0] = error
+
+
+class ComputeOutputUpstreamGradient(Operator):
+    def __init__(self,
+                 gradient,
+                 prediction,
+                 target,
+                 weights,
+                 pre_spike_time,
+                 current_period,
+                 sampling_period,
+                 tau=1.0):
+        # signals
+        self.gradient = gradient
+        self.prediction = prediction
+        self.target = target
+        self.weights = weights
+        self.pre_spike_time = pre_spike_time
+        self.current_period = current_period
+        #
+        self.sampling_period = sampling_period
+        self.tau = tau
+
+    def __call__(self, *args, **kwargs):
         import numpy as np
-        error = np.sum(error)
-        error = error / 2.0
-        self.error = error
+        if self.current_period == self.sampling_period:
+            numerator = np.zeros(shape=(10))
+            numerator[self.prediction > 0] = self.target[self.prediction > 0] - self.prediction[self.prediction > 0]
+
+            derivative_spike_response = np.zeros(shape=(10, 100))
+
+            for i in range(derivative_spike_response.shape[0]):
+                for j in range(derivative_spike_response.shape[1]):
+                    t = self.prediction[i] - self.pre_spike_time[j]
+                    if self.prediction[i] > 0 and self.pre_spike_time[j] > 0 and t >= 0:
+                        first_term = np.exp(1.0 - (t / self.tau)) / self.tau
+                        second_term = t * np.exp(1.0 - (t / self.tau)) / np.square(self.tau)
+                        all_terms = first_term - second_term
+                        derivative_spike_response[i, j] = all_terms
+
+            denominator = np.zeros(shape=(10))
+
+            for i in range(denominator.shape[0]):
+                total = 0.0
+                for j in range(derivative_spike_response.shape[1]):
+                    total += self.weights[i, j] * derivative_spike_response[i, j]
+                denominator[i] = total
+
+            self.gradient.fill(0.0)
+            self.gradient[denominator > 0] = numerator[denominator > 0] / denominator[denominator > 0]
 
 
-class UpdatePeriodAndLabel(Operator):
+class ComputeHiddenUpstreamGradient(Operator):
+    def __init__(self,
+                 upstream_gradient,
+                 pre_upstream_gradient,
+                 post_spike_time,
+                 spike_time,
+                 pre_spike_time,
+                 post_weights,
+                 pre_weights,
+                 current_period,
+                 sampling_period,
+                 tau=1.0):
+        # signals
+        self.upstream_gradient = upstream_gradient
+        self.pre_upstream_gradient = pre_upstream_gradient
+        self.post_spike_time = post_spike_time
+        self.spike_time = spike_time
+        self.pre_spike_time = pre_spike_time
+        self.post_weights = post_weights
+        self.pre_weights = pre_weights
+        self.current_period = current_period
+        #
+        self.sampling_period = sampling_period
+        self.tau = tau
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == self.sampling_period:
+            import numpy as np
+
+            numerator = np.zeros(shape=(100))
+
+            derivative_spike_response = np.zeros(shape=(10, 100))
+
+            for i in range(derivative_spike_response.shape[0]):
+                for j in range(derivative_spike_response.shape[1]):
+                    t = self.post_spike_time[i] - self.spike_time[j]
+                    if self.post_spike_time[i] > 0 and self.spike_time[j] > 0 and t >= 0:
+                        first_term = np.exp(1.0 - (t / self.tau)) / self.tau
+                        second_term = t * np.exp(1.0 - (t / self.tau)) / np.square(self.tau)
+                        all_terms = first_term - second_term
+                        derivative_spike_response[i, j] = all_terms
+
+            for j in range(derivative_spike_response.shape[1]):
+                total = 0.0
+                for i in range(derivative_spike_response.shape[0]):
+                    total += self.pre_upstream_gradient[i] * self.post_weights[i, j] * derivative_spike_response[i, j]
+                numerator[j] = total
+
+            denominator = np.zeros(shape=(100))
+
+            derivative_spike_response = np.zeros(shape=(100, 15680))
+
+            if len(self.pre_spike_time.shape) > 1:
+                pre_spike_time = self.pre_spike_time.flatten()
+
+            for i in range(derivative_spike_response.shape[0]):
+                for j in range(derivative_spike_response.shape[1]):
+                    t = self.spike_time[i] - pre_spike_time[j]
+                    if self.spike_time[i] > 0 and pre_spike_time[j] > 0 and t >= 0:
+                        first_term = np.exp(1.0 - (t / self.tau)) / self.tau
+                        second_term = t * np.exp(1.0 - (t / self.tau)) / np.square(self.tau)
+                        all_terms = first_term - second_term
+                        derivative_spike_response[i, j] = all_terms
+
+            for i in range(denominator.shape[0]):
+                total = 0.0
+                for j in range(derivative_spike_response.shape[1]):
+                    total += self.pre_weights[i, j] * derivative_spike_response[i, j]
+                denominator[i] = total
+
+            self.upstream_gradient.fill(0.0)
+            self.upstream_gradient[denominator > 0] = numerator[denominator > 0] / denominator[denominator > 0]
+
+
+class ComputeOutputGradient(Operator):
+    def __init__(self):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        pass
+
+
+class ComputeHiddenGradient(Operator):
     def __init__(self):
         pass
 

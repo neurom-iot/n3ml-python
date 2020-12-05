@@ -1,20 +1,20 @@
-import n3ml.Network as Network
-import n3ml.Source as Source
-import n3ml.Population as Population
-import n3ml.Connection as Connection
-import n3ml.Simulator as Simulator
-import n3ml.Learning as Learning
+from n3ml.Network import Network
+from n3ml.Source import MNISTSource
+from n3ml.Population import SRMPopulation
+from n3ml.Connection import Connection
+from n3ml.Simulator import Simulator
+from n3ml.Learning import SpikeProp
 
 if __name__ == '__main__':
-    net = Network.Network(code='single', learning=Learning.SpikeProp())
+    net = Network(code='single', learning=SpikeProp())
 
-    src = Source.MNISTSource(code='population', num_neurons=20)
+    src = MNISTSource(code='population', num_neurons=20)
 
-    pop_1 = Population.SRMPopulation(num_neurons=100)
-    pop_2 = Population.SRMPopulation(num_neurons=10)
+    pop_1 = SRMPopulation(num_neurons=100)
+    pop_2 = SRMPopulation(num_neurons=10)
 
-    conn_1 = Connection.Connection(pre=src, post=pop_1)
-    conn_2 = Connection.Connection(pre=pop_1, post=pop_2)
+    conn_1 = Connection(pre=src, post=pop_1)
+    conn_2 = Connection(pre=pop_1, post=pop_2)
 
     net.add(src)
     net.add(conn_1)
@@ -22,6 +22,6 @@ if __name__ == '__main__':
     net.add(conn_2)
     net.add(pop_2)
 
-    sim = Simulator.Simulator(network=net)
+    sim = Simulator(network=net)
 
     sim.run(simulation_time=0.1)

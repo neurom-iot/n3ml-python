@@ -29,8 +29,8 @@ class Simulator:
         num_steps = int(simulation_time / self.time_step)
 
         # ops for spikeprop
-        _ops = self.model.operator[:15]
-        ops = transpose(_ops, [3, 5, 7, 9, 12, 2, 4, 10, 11, 6, 13, 14, 8, 0, 1])
+        _ops = self.model.operator[:20]
+        ops = transpose(_ops, [3, 5, 7, 9, 12, 2, 4, 10, 11, 6, 13, 14, 8, 15, 16, 17, 18, 19, 0, 1])
 
         # ops for stdp
         #_ops = self.model.operator[:5]
@@ -60,8 +60,14 @@ class Simulator:
         for step in range(num_steps):
             self._run_step(ops)
 
+            print(self.model.signal[self.network.connection[0]]['spike_response'])
+            print(self.model.signal[self.network.population[0]]['membrane_potential'])
             print(self.model.signal[self.network.population[0]]['spike_time'])
             print(self.model.signal[self.network.population[1]]['spike_time'])
+            print(self.model.signal[self.network.learning]['label'])
+            print(self.model.signal[self.network.learning]['target'])
+            print(self.model.signal[self.network.learning]['prediction'])
+            print(self.model.signal[self.network.learning]['error'])
 
             print("time: {} - period: {}".format(self.model.signal['current_time'], self.model.signal['current_period']))
 
