@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import norm
 
 class Operator:
     def __init__(self):
@@ -43,7 +44,7 @@ class InitWeight(Operator):
             if self.value is not None:
                 self.weight *= self.value
             elif self.random_process is not None:
-                self.weight[:] = self.random_process(-1.0, 1.0, self.weight.shape)
+                self.weight[:] = self.random_process(0.2, 1.0, self.weight.shape)
 
 
 class MatMul(Operator):
@@ -136,6 +137,48 @@ class UpdateWeight(Operator):
             self.weight += self.gradient
 
 
+class ShuffleIRISDataset(Operator):
+    def __init__(self,
+                 data_index,
+                 current_period,
+                 indexes,
+                 dataset):
+        # signal
+        self.data_index = data_index
+        self.current_period = current_period
+        #
+        self.indexes = indexes
+        self.dataset = dataset
+        self.num_data = self.dataset.shape[0]
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == 0:
+            if self.data_index >= self.num_data:
+                self.data_index.fill(0)
+                np.random.shuffle(self.indexes)
+
+
+class SampleIRISData(Operator):
+    def __init__(self,
+                 data,
+                 data_index,
+                 current_period,
+                 indexes,
+                 dataset):
+        # signals
+        self.data = data
+        self.data_index = data_index
+        self.current_period = current_period
+        #
+        self.indexes = indexes
+        self.dataset = dataset
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == 0:
+            self.data[:] = self.dataset[self.indexes[self.data_index]]
+            self.data_index += 1
+
+
 class SampleImage(Operator):
     def __init__(self,
                  image,
@@ -175,6 +218,59 @@ class SpikeTime(Operator):
         # spike_time 중에서 not-to-fire 상태인 변수에 대해서만 아래 것을 계산하면 된다.
         self.spike_time[(self.spike_time < 0) & (self.membrane_potential > self.threshold)] = self.current_period
         self.membrane_potential[self.membrane_potential > self.threshold] = 0
+
+
+class IRISPopulationEncoder(Operator):
+    def __init__(self,
+                 spike_time,
+                 data,
+                 current_period,
+                 sampling_period,
+                 num_neurons,
+                 beta,
+                 min_vals,
+                 max_vals):
+        # signals
+        self.spike_time = spike_time
+        self.data = data
+        self.current_period = current_period
+        #
+        self.num_neurons = num_neurons
+        self.sampling_period = sampling_period
+        self.beta = beta
+        self.min_vals = min_vals
+        self.max_vals = max_vals
+
+        self.means = np.zeros(shape=(self.data.shape[0], self.num_neurons))
+        self.stds = np.zeros(shape=(self.data.shape[0]))
+
+        # Compute means and stds for normal distributions
+        for i in range(self.data.shape[0]):
+            for j in range(self.num_neurons):
+                x = j + 1
+                self.means[i, j] = self.min_vals[i]+(2*x-3)*(self.max_vals[i]-self.min_vals[i])/(2*(self.num_neurons-2))
+            self.stds[i] = (max_vals[i]-min_vals[i])/(self.beta*(self.num_neurons-2))
+
+        self.max_pdfs = [norm.pdf(0, scale=self.stds[i]) for i in range(self.stds.shape[0])]
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == 0:
+            for i in range(self.means.shape[0]):
+                for j in range(self.means.shape[1]):
+                    self.spike_time[i*self.means.shape[1] + j] = self._transform_spike_time(
+                        norm.pdf(self.data[i], self.means[i, j], self.stds[i]), self.max_pdfs[i])
+
+            self.spike_time[-1] = 0
+            self.spike_time[-2] = 0
+
+    def _transform_spike_time(self, response, max_pdf):
+        max_spike_time = self.sampling_period
+        max_response = max_pdf
+        spike_time = response * max_spike_time / max_response
+        spike_time = spike_time - max_spike_time
+        spike_time = spike_time * -1.0
+        spike_time = round(spike_time)
+        return spike_time
 
 
 class PopulationEncode(Operator):

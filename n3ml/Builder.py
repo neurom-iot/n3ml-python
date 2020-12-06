@@ -1,3 +1,5 @@
+import numpy as np
+
 class Builder:
     @classmethod
     def build(cls, model, obj):
@@ -20,7 +22,7 @@ class Builder:
 
 def build_network(model, network):
     import numpy as np
-    from n3ml.Source import Source
+    from n3ml.Source import Source, MNISTSource, IRISSource
     from n3ml.Connection import Connection
     from n3ml.Population import Population, SRMPopulation, Processing
     from n3ml.Operators import UpdateTime, UpdatePeriod
@@ -36,7 +38,10 @@ def build_network(model, network):
 
     for obj in network.source + network.population:
         if isinstance(obj, Source):
-            build_mnistsource(model, obj)
+            if isinstance(obj, MNISTSource):
+                build_mnistsource(model, obj)
+            elif isinstance(obj, IRISSource):
+                build_irissource(model, obj)
         elif isinstance(obj, Population):
             if isinstance(obj, SRMPopulation):
                 build_srmpopulation(model, obj)
@@ -51,7 +56,8 @@ def build_network(model, network):
     if isinstance(network.learning, Learning.STDP):
         pass
     elif isinstance(network.learning, Learning.SpikeProp):
-        build_spikeprop(model, network)
+        pass
+        # build_spikeprop(model, network)
 
 
 def build_mnistsource(model, mnistsource):
@@ -100,6 +106,45 @@ def build_mnistsource(model, mnistsource):
                                                       firing_rate=model.signal[mnistsource]['firing_rate']))
 
 
+def build_irissource(model, source):
+    from n3ml.Operators import ShuffleIRISDataset
+    from n3ml.Operators import SampleIRISData
+    from n3ml.Operators import IRISPopulationEncoder
+    from n3ml.Operators import InitSpikeTime
+
+    model.signal[source] = {}
+
+    model.signal[source]['data'] = np.zeros(shape=(source.dataset.shape[1]))
+    model.signal[source]['data_index'] = np.array(0)
+
+    model.add_op(ShuffleIRISDataset(data_index=model.signal[source]['data_index'],
+                                    current_period=model.signal['current_period'],
+                                    indexes=source.indexes,
+                                    dataset=source.dataset))
+
+    model.add_op(SampleIRISData(data=model.signal[source]['data'],
+                                data_index=model.signal[source]['data_index'],
+                                current_period=model.signal['current_period'],
+                                indexes=source.indexes,
+                                dataset=source.dataset))
+
+    model.signal[source]['spike_time'] = np.zeros(
+        shape=(source.num_neurons * source.dataset.shape[1] + 2))
+
+    model.add_op(InitSpikeTime(spike_time=model.signal[source]['spike_time'],
+                               current_period=model.signal['current_period'],
+                               value=model.nan))
+
+    model.add_op(IRISPopulationEncoder(spike_time=model.signal[source]['spike_time'],
+                                       data=model.signal[source]['data'],
+                                       current_period=model.signal['current_period'],
+                                       sampling_period=source.sampling_period,
+                                       num_neurons=source.num_neurons,
+                                       beta=source.beta,
+                                       min_vals=source.min_vals,
+                                       max_vals=source.max_vals))
+
+
 def build_srmpopulation(model, srmpopulation):
     import numpy as np
     import n3ml.Operators as Operators
@@ -121,14 +166,19 @@ def build_srmpopulation(model, srmpopulation):
 
 def build_connection(model, connection):
     import numpy as np
-    from n3ml.Source import Source
+    from n3ml.Source import Source, MNISTSource, IRISSource
     from n3ml.Population import Population
     from n3ml.Operators import SpikeResponse, MatMul, InitWeight
 
     if isinstance(connection.pre, Population):
         pre_num_neurons = connection.pre.num_neurons
     elif isinstance(connection.pre, Source):
-        pre_num_neurons = connection.pre.rows * connection.pre.cols * connection.pre.num_neurons
+        if isinstance(connection.pre, MNISTSource):
+            pre_num_neurons = connection.pre.rows * connection.pre.cols * connection.pre.num_neurons
+        elif isinstance(connection.pre, IRISSource):
+            pre_num_neurons = model.signal[connection.pre]['spike_time'].shape[0]
+        else:
+            raise ValueError
     else:
         raise ValueError
 

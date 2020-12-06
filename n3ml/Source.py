@@ -4,6 +4,40 @@ class Source:
         self.code = code
 
 
+class IRISSource(Source):
+    def __init__(self,
+                 code,
+                 num_neurons,
+                 sampling_period,
+                 beta=1.0):
+        super().__init__('iris', code)
+        self.num_neurons = num_neurons
+        self.sampling_period = sampling_period
+        self.beta = beta
+        self.dataset = None
+        self.target = None
+        self.min_vals = None
+        self.max_vals = None
+
+        self._load_iris()
+        self._get_statistics()
+
+        import numpy as np
+        self.indexes = np.arange(self.dataset.shape[0])
+        np.random.shuffle(self.indexes)
+
+    def _load_iris(self):
+        from sklearn.datasets import load_iris
+        iris = load_iris()
+        self.dataset = iris['data']
+        self.target = iris['target']
+
+    def _get_statistics(self):
+        import numpy as np
+        self.min_vals = np.amin(self.dataset, axis=0)
+        self.max_vals = np.amax(self.dataset, axis=0)
+
+
 class MNISTSource(Source):
     def __init__(self,
                  code,
@@ -40,3 +74,9 @@ class MNISTSource(Source):
             bytestream.read(8)
             raw_data = np.frombuffer(bytestream.read(), dtype='>u1')
         self.labels = raw_data.reshape(self.num_images)
+
+
+if __name__ == '__main__':
+    iris = IRISSource(code='population', num_neurons=12, sampling_period=10)
+
+    print()
