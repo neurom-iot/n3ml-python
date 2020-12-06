@@ -29,26 +29,8 @@ class Simulator:
         num_steps = int(simulation_time / self.time_step)
 
         # ops for spikeprop
-        _ops = self.model.operator[:20]
-        ops = transpose(_ops, [3, 5, 7, 9, 12, 2, 4, 10, 11, 6, 13, 14, 8, 15, 16, 17, 18, 19, 0, 1])
-
-        # ops for stdp
-        #_ops = self.model.operator[:5]
-        #ops = transpose(_ops, [2, 3, 4, 0, 1])
-
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
-        # self._run_step(ops)
+        _ops = self.model.operator[:24]
+        ops = transpose(_ops, [3, 5, 7, 9, 12, 2, 4, 10, 11, 6, 13, 14, 8, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1])
 
         logger = {
             'image': [],
@@ -67,7 +49,7 @@ class Simulator:
             print(self.model.signal[self.network.learning]['label'])
             print(self.model.signal[self.network.learning]['target'])
             print(self.model.signal[self.network.learning]['prediction'])
-            print(self.model.signal[self.network.learning]['error'])
+            print("error: {}".format(self.model.signal[self.network.learning]['error']))
 
             print("time: {} - period: {}".format(self.model.signal['current_time'], self.model.signal['current_period']))
 

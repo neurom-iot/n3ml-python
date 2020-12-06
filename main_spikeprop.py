@@ -24,4 +24,4 @@ if __name__ == '__main__':
 
     sim = Simulator(network=net)
 
-    sim.run(simulation_time=0.1)
+    sim.run(simulation_time=50)
