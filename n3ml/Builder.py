@@ -56,8 +56,7 @@ def build_network(model, network):
     if isinstance(network.learning, Learning.STDP):
         pass
     elif isinstance(network.learning, Learning.SpikeProp):
-        pass
-        # build_spikeprop(model, network)
+        build_spikeprop(model, network)
 
 
 def build_mnistsource(model, mnistsource):
@@ -111,11 +110,17 @@ def build_irissource(model, source):
     from n3ml.Operators import SampleIRISData
     from n3ml.Operators import IRISPopulationEncoder
     from n3ml.Operators import InitSpikeTime
+    from n3ml.Operators import UpdateIndex
 
     model.signal[source] = {}
 
     model.signal[source]['data'] = np.zeros(shape=(source.dataset.shape[1]))
     model.signal[source]['data_index'] = np.array(0)
+
+    model.add_op(UpdateIndex(index=model.signal[source]['data_index'],
+                             num_data=source.dataset.shape[0],
+                             current_period=model.signal['current_period'],
+                             sampling_period=source.sampling_period))
 
     model.add_op(ShuffleIRISDataset(data_index=model.signal[source]['data_index'],
                                     current_period=model.signal['current_period'],
@@ -263,16 +268,23 @@ def build_spikeprop(model, network):
 
     model.signal[learning]['label'] = np.array([0])
     # TODO: Modify the arguement 'shape' using num_classes for consistency
-    model.signal[learning]['target'] = np.zeros(shape=(10))
+    model.signal[learning]['target'] = np.zeros(shape=(3))
     model.signal[learning]['prediction'] = model.signal[network.population[-1]]['spike_time']
     model.signal[learning]['error'] = np.array([0.0])
-    model.signal[learning]['output_upstream_gradient'] = np.zeros(shape=(10))
-    model.signal[learning]['hidden_upstream_gradient'] = np.zeros(shape=(100))
-    model.signal[learning]['output_gradient'] = np.zeros(shape=(10, 100))
-    model.signal[learning]['hidden_gradient'] = np.zeros(shape=(100, 15680))
+    model.signal[learning]['output_upstream_gradient'] = np.zeros(shape=(3))
+    model.signal[learning]['hidden_upstream_gradient'] = np.zeros(shape=(10))
+    model.signal[learning]['output_gradient'] = np.zeros(shape=(3, 10))
+    model.signal[learning]['hidden_gradient'] = np.zeros(shape=(10, 50))
+
+    # model.add_op(UpdateLabel(label=model.signal[learning]['label'],
+    #                          index=model.signal[network.source[0]]['data_index'],
+    #                          labels=network.source[0].target,
+    #                          current_period=model.signal['current_period'],
+    #                          sampling_period=network.source[0].sampling_period,
+    #                          indexes=network.source[0].indexes))
 
     model.add_op(UpdateLabel(label=model.signal[learning]['label'],
-                             label_index=model.signal[network.source[0]]['image_index'],
+                             index=model.signal[network.source[0]]['image_index'],
                              labels=network.source[0].labels,
                              current_period=model.signal['current_period'],
                              sampling_period=network.source[0].sampling_period))

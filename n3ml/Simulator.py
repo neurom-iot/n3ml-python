@@ -29,12 +29,12 @@ class Simulator:
         num_steps = int(simulation_time / self.time_step)
 
         # ops for spikeprop in mnists
-        # _ops = self.model.operator[:24]
-        # ops = transpose(_ops, [3, 5, 7, 9, 12, 2, 4, 10, 11, 6, 13, 14, 8, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1])
+        _ops = self.model.operator[:24]
+        ops = transpose(_ops, [3, 5, 7, 9, 12, 2, 4, 10, 11, 6, 13, 14, 8, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1])
 
         # ops for spikeprop in iris
-        _ops = self.model.operator[:16]
-        ops = transpose(_ops, [4, 6, 8, 10, 13, 2, 3, 5, 11, 12, 7, 14, 15, 9, 0, 1])
+        # _ops = self.model.operator[:26]
+        # ops = transpose(_ops, [5, 7, 9, 11, 14, 2, 3, 17, 18, 4, 6, 12, 13, 8, 15, 16, 10, 19, 20, 21, 22, 23, 24, 25, 0, 1])
 
         logger = {
             'image': [],
@@ -46,16 +46,17 @@ class Simulator:
         for step in range(num_steps):
             self._run_step(ops)
 
+            print(self.model.signal[self.network.source[0]]['data_index'])
+
+            # print(self.model.signal[self.network.connection[0]]['synaptic_weight'])
+            print(self.model.signal[self.network.connection[1]]['synaptic_weight'])
+
             print(self.model.signal[self.network.source[0]]['data'])
             print(self.model.signal[self.network.source[0]]['spike_time'])
-            # print(self.model.signal[self.network.connection[0]]['spike_response'])
-            # print(self.model.signal[self.network.population[0]]['membrane_potential'])
             print(self.model.signal[self.network.population[0]]['spike_time'])
             print(self.model.signal[self.network.population[1]]['spike_time'])
-            # print(self.model.signal[self.network.learning]['label'])
-            # print(self.model.signal[self.network.learning]['target'])
-            # print(self.model.signal[self.network.learning]['prediction'])
-            # print("error: {}".format(self.model.signal[self.network.learning]['error']))
+            print(self.model.signal[self.network.learning]['target'])
+            print("error: {}".format(self.model.signal[self.network.learning]['error']))
 
             print("time: {} - period: {}".format(self.model.signal['current_time'], self.model.signal['current_period']))
 

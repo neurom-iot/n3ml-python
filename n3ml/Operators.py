@@ -44,7 +44,7 @@ class InitWeight(Operator):
             if self.value is not None:
                 self.weight *= self.value
             elif self.random_process is not None:
-                self.weight[:] = self.random_process(0.2, 1.0, self.weight.shape)
+                self.weight[:] = self.random_process(0, 0.4, self.weight.shape)
 
 
 class MatMul(Operator):
@@ -83,21 +83,26 @@ class UpdatePeriod(Operator):
 class UpdateLabel(Operator):
     def __init__(self,
                  label,
-                 label_index,
+                 index,
                  labels,
                  current_period,
-                 sampling_period):
+                 sampling_period,
+                 indexes=None):
         # Signals
         self.label = label
-        self.label_index = label_index
+        self.index = index
         self.current_period = current_period
         #
         self.sampling_period = sampling_period
         self.labels = labels
+        self.indexes = indexes
 
     def __call__(self, *args, **kwargs):
         if self.current_period == self.sampling_period:
-            self.label[0] = self.labels[self.label_index]
+            if self.indexes is None:
+                self.label[0] = self.labels[self.index]
+            else:
+                self.label[0] = self.labels[self.indexes[self.index]]
 
 
 class UpdateTarget(Operator):
@@ -154,7 +159,6 @@ class ShuffleIRISDataset(Operator):
     def __call__(self, *args, **kwargs):
         if self.current_period == 0:
             if self.data_index >= self.num_data:
-                self.data_index.fill(0)
                 np.random.shuffle(self.indexes)
 
 
@@ -176,7 +180,26 @@ class SampleIRISData(Operator):
     def __call__(self, *args, **kwargs):
         if self.current_period == 0:
             self.data[:] = self.dataset[self.indexes[self.data_index]]
-            self.data_index += 1
+
+
+class UpdateIndex(Operator):
+    def __init__(self,
+                 index,
+                 num_data,
+                 current_period,
+                 sampling_period):
+        #
+        self.index = index
+        #
+        self.num_data = num_data
+        self.current_period = current_period
+        self.sampling_period = sampling_period
+
+    def __call__(self, *args, **kwargs):
+        if self.current_period == self.sampling_period:
+            self.index += 1
+            if self.index >= self.num_data:
+                self.index.fill(0)
 
 
 class SampleImage(Operator):
@@ -364,7 +387,7 @@ class SpikeResponse(Operator):
                  current_period,
                  spike_time,
                  spike_response,
-                 tau=1.0):
+                 tau=3.0):
         # inputs
         self.current_period = current_period
         self.spike_time = spike_time
@@ -428,7 +451,7 @@ class ComputeOutputUpstreamGradient(Operator):
                  pre_spike_time,
                  current_period,
                  sampling_period,
-                 tau=1.0):
+                 tau=3.0):
         # signals
         self.gradient = gradient
         self.prediction = prediction
@@ -443,10 +466,10 @@ class ComputeOutputUpstreamGradient(Operator):
     def __call__(self, *args, **kwargs):
         import numpy as np
         if self.current_period == self.sampling_period:
-            numerator = np.zeros(shape=(10))
+            numerator = np.zeros(shape=(3))
             numerator[self.prediction > 0] = self.target[self.prediction > 0] - self.prediction[self.prediction > 0]
 
-            derivative_spike_response = np.zeros(shape=(10, 100))
+            derivative_spike_response = np.zeros(shape=(3, 10))
 
             for i in range(derivative_spike_response.shape[0]):
                 for j in range(derivative_spike_response.shape[1]):
@@ -457,7 +480,7 @@ class ComputeOutputUpstreamGradient(Operator):
                         all_terms = first_term - second_term
                         derivative_spike_response[i, j] = all_terms
 
-            denominator = np.zeros(shape=(10))
+            denominator = np.zeros(shape=(3))
 
             for i in range(denominator.shape[0]):
                 total = 0.0
@@ -480,7 +503,7 @@ class ComputeHiddenUpstreamGradient(Operator):
                  pre_weights,
                  current_period,
                  sampling_period,
-                 tau=1.0):
+                 tau=3.0):
         # signals
         self.upstream_gradient = upstream_gradient
         self.pre_upstream_gradient = pre_upstream_gradient
@@ -498,9 +521,9 @@ class ComputeHiddenUpstreamGradient(Operator):
         if self.current_period == self.sampling_period:
             import numpy as np
 
-            numerator = np.zeros(shape=(100))
+            numerator = np.zeros(shape=(10))
 
-            derivative_spike_response = np.zeros(shape=(10, 100))
+            derivative_spike_response = np.zeros(shape=(3, 10))
 
             for i in range(derivative_spike_response.shape[0]):
                 for j in range(derivative_spike_response.shape[1]):
@@ -517,12 +540,14 @@ class ComputeHiddenUpstreamGradient(Operator):
                     total += self.pre_upstream_gradient[i] * self.post_weights[i, j] * derivative_spike_response[i, j]
                 numerator[j] = total
 
-            denominator = np.zeros(shape=(100))
+            denominator = np.zeros(shape=(10))
 
-            derivative_spike_response = np.zeros(shape=(100, 15680))
+            derivative_spike_response = np.zeros(shape=(10, 50))
 
             if len(self.pre_spike_time.shape) > 1:
                 pre_spike_time = self.pre_spike_time.flatten()
+            else:
+                pre_spike_time = self.pre_spike_time
 
             for i in range(derivative_spike_response.shape[0]):
                 for j in range(derivative_spike_response.shape[1]):
@@ -551,8 +576,8 @@ class ComputeOutputGradient(Operator):
                  pre_spike_time,
                  current_period,
                  sampling_period,
-                 learning_rate=0.1,
-                 tau=1.0):
+                 learning_rate=0.0075,
+                 tau=3.0):
         # signals
         self.output_gradient = output_gradient
         self.output_upstream_gradient = output_upstream_gradient
@@ -566,10 +591,10 @@ class ComputeOutputGradient(Operator):
 
     def __call__(self, *args, **kwargs):
         if self.current_period == self.sampling_period:
-            firing_time = np.tile(self.prediction, (100, 1))
+            firing_time = np.tile(self.prediction, (10, 1))
             firing_time = np.transpose(firing_time, (1, 0))
 
-            pre_firing_time = np.tile(self.pre_spike_time, (10, 1))
+            pre_firing_time = np.tile(self.pre_spike_time, (3, 1))
 
             t = firing_time - pre_firing_time
             x = t / self.tau
@@ -577,7 +602,7 @@ class ComputeOutputGradient(Operator):
             y = x * y
             y[(firing_time < 0) | (pre_firing_time < 0) | (y < 0)] = 0
 
-            upstream = np.tile(self.output_upstream_gradient, (100, 1))
+            upstream = np.tile(self.output_upstream_gradient, (10, 1))
             upstream = np.transpose(upstream, (1, 0))
 
             gradient = -self.learning_rate * y
@@ -594,8 +619,8 @@ class ComputeHiddenGradient(Operator):
                  pre_spike_time,
                  current_period,
                  sampling_period,
-                 learning_rate=0.1,
-                 tau=1.0):
+                 learning_rate=0.0075,
+                 tau=3.0):
         # signals
         self.output_gradient = output_gradient
         self.output_upstream_gradient = output_upstream_gradient
@@ -609,11 +634,11 @@ class ComputeHiddenGradient(Operator):
 
     def __call__(self, *args, **kwargs):
         if self.current_period == self.sampling_period:
-            firing_time = np.tile(self.spike_time, (15680, 1))
+            firing_time = np.tile(self.spike_time, (50, 1))
             firing_time = np.transpose(firing_time, (1, 0))
 
             pre_firing_time = self.pre_spike_time.flatten()
-            pre_firing_time = np.tile(pre_firing_time, (100, 1))
+            pre_firing_time = np.tile(pre_firing_time, (10, 1))
 
             t = firing_time - pre_firing_time
             x = t / self.tau
@@ -621,7 +646,7 @@ class ComputeHiddenGradient(Operator):
             y *= x
             y[(firing_time < 0) | (pre_firing_time < 0) | (y < 0)] = 0
 
-            upstream = np.tile(self.output_upstream_gradient, (15680, 1))
+            upstream = np.tile(self.output_upstream_gradient, (50, 1))
             upstream = np.transpose(upstream, (1, 0))
 
             gradient = -self.learning_rate * y
